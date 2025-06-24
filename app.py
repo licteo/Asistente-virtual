@@ -6,19 +6,15 @@ import nltk
 from googleapiclient.discovery import build
 import requests
 import streamlit as st
-from nltk import downloader # <--- ¡AÑADE ESTA LÍNEA!
+# from nltk import downloader # <--- ¡ELIMINA O COMENTA ESTA LÍNEA!
 
-# --- NLTK: Descargar recursos (Ejecutar solo si no están ya en el sistema de Streamlit Cloud) ---
-# En Streamlit Cloud, estos recursos se descargan la primera vez o si tu app los requiere.
-# Puedes descomentar estas líneas si la app falla por falta de recursos NLTK.
-try:
-    nltk.data.find('corpora/punkt')
-except downloader.DownloadError: # Ahora 'downloader.DownloadError' será reconocido
-    nltk.download('punkt')
-try:
-    nltk.data.find('corpora/wordnet')
-except downloader.DownloadError: # Y aquí también
-    nltk.download('wordnet')
+
+# --- NLTK: Descargar recursos ---
+# Estas líneas se ejecutarán cada vez que la app inicie.
+# NLTK es inteligente y no descargará si ya existen,
+# lo que lo hace la forma más robusta para Streamlit Cloud.
+nltk.download('punkt')
+nltk.download('wordnet')
 # --------------------------------------------------------------------------------------
 
 
@@ -29,6 +25,8 @@ conversaciones = {
     "qué hora es": "No tengo forma de saber la hora exacta, pero puedo ayudarte con otras cosas.",
     "adiós": "¡Hasta luego! Que tengas un buen día."
 }
+
+# ... (El resto de tu código de app.py sigue igual) ...
 
 # ... (El resto de tu código de app.py sigue igual) ...
 
