@@ -1,11 +1,10 @@
 # Importar las librerías necesarias
 import nltk
 from googleapiclient.discovery import build
-import requests # Para la API del clima
-import streamlit as st # <<<< ¡ESTA LÍNEA ES CRUCIAL!
+import requests
+import streamlit as st
 
 # Descargar recursos de NLTK
-# Estas descargas son necesarias para NLTK, se ejecutan cuando Streamlit inicia app.py
 nltk.download('punkt')
 nltk.download('wordnet')
 
@@ -18,12 +17,15 @@ conversaciones = {
 }
 
 # 2. Configura tus claves de API
-# ¡IMPORTANTE! Reemplaza con tus claves reales
-GOOGLE_API_KEY = "AIzaSyCKD9ZiNGPzRhsa7bSZBm_XYGNdWxXNEyM"
-CUSTOM_SEARCH_ENGINE_ID = "622da2f1bf1d04cb9"
-OPENWEATHER_API_KEY = "622da2f1bf1d04cb9" # Si la estás usando
+# ¡IMPORTANTE! PARA COLAB, PON TUS CLAVES DIRECTAMENTE AQUÍ.
+# CUANDO DESPLIEGUES EN STREAMLIT CLOUD, USA st.secrets
+HUGGINGFACE_API_TOKEN = "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" # TU TOKEN REAL
+GOOGLE_API_KEY = "AIzaSyCKD9ZiNGPzRhsa7bSZBm_XYGNdWxXNEyM" # TU CLAVE REAL DE GOOGLE
+CUSTOM_SEARCH_ENGINE_ID = "622da2f1bf1d04cb9" # TU ID REAL DE MOTOR DE BUSQUEDA
+OPENWEATHER_API_KEY = "TU_CLAVE_REAL_DE_OPENWEATHERMAP_AQUI" # TU CLAVE REAL DE OPENWEATHERMAP
 
-# 3. Función para buscar en internet (si la usas)
+
+# 3. Función para buscar en internet
 def buscar_en_internet(pregunta):
     """Busca en internet utilizando la API de búsqueda de Google Custom Search."""
     try:
@@ -34,9 +36,9 @@ def buscar_en_internet(pregunta):
         else:
             return "Lo siento, no encontré información relevante en internet."
     except Exception as e:
-        return f"Ocurrió un error al buscar en internet: {e}"
+        return f"Ocurrió un error al buscar en internet: {e}. Asegúrate de que tus claves de Google sean correctas y diferentes."
 
-# 4. Función para obtener el clima (si la usas)
+# 4. Función para obtener el clima
 def obtener_clima(ciudad):
     """Obtiene información del clima para una ciudad específica usando OpenWeatherMap."""
     base_url = "http://api.openweathermap.org/data/2.5/weather"
@@ -62,9 +64,79 @@ def obtener_clima(ciudad):
     except Exception as e:
         return f"Ocurrió un error inesperado al procesar el clima: {e}"
 
+# === Nueva Función para el modelo Mixtral ===
+def ask_mixtral(prompt):
+    """
+    Envía un prompt a mistralai/Mixtral-8x7B-Instruct-v0.1 via API de Inferencia.
+    """
+    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1"
+    headers = {"Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}"}
+    formatted_prompt = f"<s>[INST] {prompt} [/INST]"
+
+    payload = {
+        "inputs": formatted_prompt,
+        "parameters": {
+            "max_new_tokens": 250,
+            "temperature": 0.7,
+            "do_sample": True,
+            "return_full_text": False
+        }
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        result = response.json()
+
+        if isinstance(result, list) and result and "generated_text" in result[0]:
+            return result[0]["generated_text"].strip()
+        else:
+            return f"Mixtral no pudo generar una respuesta. Detalles: {result}. Posibles causas: límites de API, modelo no accesible, o error interno."
+
+    except requests.exceptions.RequestException as e:
+        return f"Error de conexión con Mixtral: {e}. Puede que requiera suscripción o acceso especial."
+    except Exception as e:
+        return f"Error inesperado con Mixtral: {e}"
+
+# === Nueva Función para el modelo Llama 3.1 ===
+def ask_llama(prompt):
+    """
+    Envía un prompt a meta-llama/Llama-3.1-8B-Instruct via API de Inferencia.
+    """
+    API_URL = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.1-8B-Instruct"
+    headers = {"Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}"}
+    # Formato para Llama 3.1 Instruct
+    formatted_prompt = f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+
+    payload = {
+        "inputs": formatted_prompt,
+        "parameters": {
+            "max_new_tokens": 250,
+            "temperature": 0.7,
+            "do_sample": True,
+            "return_full_text": False # Solo devuelve el texto generado
+        }
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        result = response.json()
+
+        if isinstance(result, list) and result and "generated_text" in result[0]:
+            return result[0]["generated_text"].strip()
+        else:
+            return f"Llama no pudo generar una respuesta. Detalles: {result}. Posibles causas: límites de API, modelo no accesible, o error interno."
+
+    except requests.exceptions.RequestException as e:
+        return f"Error de conexión con Llama 3.1: {e}. Puede que requiera suscripción o acceso especial."
+    except Exception as e:
+        return f"Error inesperado con Llama 3.1: {e}"
+
+
 # 5. Función principal de respuesta del chatbot
 def responder(mensaje):
-    """Responde a un mensaje, buscando en conversaciones, luego el clima, y finalmente en internet."""
+    """Responde a un mensaje, buscando en conversaciones, luego el clima, la IA (Mixtral/Llama), y finalmente en internet."""
     mensaje_lower = mensaje.lower()
 
     if mensaje_lower in conversaciones:
@@ -76,8 +148,14 @@ def responder(mensaje):
             if ciudad:
                 return obtener_clima(ciudad)
         return "Para el clima, por favor especifica la ciudad (ej. 'clima en Londres')."
+    elif mensaje_lower.startswith("ia mixtral:"): # Nuevo prefijo para Mixtral
+        pregunta_ia = mensaje[len("ia mixtral:"):].strip()
+        return ask_mixtral(pregunta_ia)
+    elif mensaje_lower.startswith("ia llama:"): # Nuevo prefijo para Llama
+        pregunta_ia = mensaje[len("ia llama:"):].strip()
+        return ask_llama(pregunta_ia)
     else:
-        return buscar_en_internet(mensaje) # O "Lo siento, no sé qué responder a eso." si no usas APIs externas
+        return buscar_en_internet(mensaje)
 
 # === CÓDIGO DE STREAMLIT PARA LA INTERFAZ ===
 
@@ -94,15 +172,12 @@ for message in st.session_state.messages:
 
 # Campo de entrada para el usuario
 if prompt := st.chat_input("Escribe tu mensaje aquí:"):
-    # Añadir mensaje del usuario al historial
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Obtener la respuesta del chatbot
     with st.chat_message("assistant"):
-        with st.spinner("Pensando..."): # Muestra un spinner mientras el chatbot responde
+        with st.spinner("Pensando..."):
             respuesta_chatbot = responder(prompt)
             st.markdown(respuesta_chatbot)
-    # Añadir respuesta del chatbot al historial
     st.session_state.messages.append({"role": "assistant", "content": respuesta_chatbot})
