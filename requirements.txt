@@ -1,0 +1,5 @@
+nltk
+scikit-learn
+google-api-python-client
+requests
+streamlit
