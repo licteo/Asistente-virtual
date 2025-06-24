@@ -1,28 +1,49 @@
+# app.py
+# Este archivo debe subirse a GitHub para ser desplegado en Streamlit Community Cloud.
+
 # Importar las librerías necesarias
 import nltk
 from googleapiclient.discovery import build
 import requests
 import streamlit as st
 
-# Descargar recursos de NLTK
-nltk.download('punkt')
-nltk.download('wordnet')
+# --- NLTK: Descargar recursos (Ejecutar solo si no están ya en el sistema de Streamlit Cloud) ---
+# En Streamlit Cloud, estos recursos se descargan la primera vez o si tu app los requiere.
+# Puedes descomentar estas líneas si la app falla por falta de recursos NLTK.
+try:
+    nltk.data.find('corpora/punkt')
+except nltk.downloader.DownloadError:
+    nltk.download('punkt')
+try:
+    nltk.data.find('corpora/wordnet')
+except nltk.downloader.DownloadError:
+    nltk.download('wordnet')
+# --------------------------------------------------------------------------------------
+
 
 # 1. Define las conversaciones predefinidas de tu chatbot
 conversaciones = {
     "hola": "¡Hola! ¿Cómo estás?",
-    "cuál es tu nombre": "Soy un chatbot creado en Colab.",
+    "cuál es tu nombre": "Soy un chatbot creado en Python.",
     "qué hora es": "No tengo forma de saber la hora exacta, pero puedo ayudarte con otras cosas.",
     "adiós": "¡Hasta luego! Que tengas un buen día."
 }
 
 # 2. Configura tus claves de API
-# ¡IMPORTANTE! PARA COLAB, PON TUS CLAVES DIRECTAMENTE AQUÍ.
-# CUANDO DESPLIEGUES EN STREAMLIT CLOUD, USA st.secrets
-HUGGINGFACE_API_TOKEN = "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" # TU TOKEN REAL
-GOOGLE_API_KEY = "AIzaSyCKD9ZiNGPzRhsa7bSZBm_XYGNdWxXNEyM" # TU CLAVE REAL DE GOOGLE
-CUSTOM_SEARCH_ENGINE_ID = "622da2f1bf1d04cb9" # TU ID REAL DE MOTOR DE BUSQUEDA
-OPENWEATHER_API_KEY = "TU_CLAVE_REAL_DE_OPENWEATHERMAP_AQUI" # TU CLAVE REAL DE OPENWEATHERMAP
+# IMPORTANTE: Para Streamlit Community Cloud, SIEMPRE USA st.secrets["NOMBRE_DEL_SECRETO"]
+# Los valores REALES de estas claves se configurarán en el panel de control de tu app en share.streamlit.io
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+CUSTOM_SEARCH_ENGINE_ID = st.secrets["CUSTOM_SEARCH_ENGINE_ID"]
+OPENWEATHER_API_KEY = st.secrets["OPENWEATHER_API_KEY"]
+HUGGINGFACE_API_TOKEN = st.secrets["HUGGINGFACE_API_TOKEN"]
+
+# Si estás probando en Colab y no en Streamlit Cloud, CAMBIA las líneas de arriba
+# a tus claves DIRECTAS para probar localmente.
+# Ejemplo para Colab:
+# GOOGLE_API_KEY = "TU_CLAVE_API_DE_GOOGLE_REAL"
+# CUSTOM_SEARCH_ENGINE_ID = "TU_ID_DE_MOTOR_DE_BUSQUEDA_PERSONALIZADA_REAL"
+# OPENWEATHER_API_KEY = "TU_CLAVE_REAL_DE_OPENWEATHERMAP"
+# HUGGINGFACE_API_TOKEN = "hf_TU_TOKEN_REAL_DE_HUGGING_FACE"
 
 
 # 3. Función para buscar en internet
@@ -36,7 +57,7 @@ def buscar_en_internet(pregunta):
         else:
             return "Lo siento, no encontré información relevante en internet."
     except Exception as e:
-        return f"Ocurrió un error al buscar en internet: {e}. Asegúrate de que tus claves de Google sean correctas y diferentes."
+        return f"Ocurrió un error al buscar en internet: {e}. Revisa tu Google API Key y Custom Search Engine ID."
 
 # 4. Función para obtener el clima
 def obtener_clima(ciudad):
@@ -64,7 +85,7 @@ def obtener_clima(ciudad):
     except Exception as e:
         return f"Ocurrió un error inesperado al procesar el clima: {e}"
 
-# === Nueva Función para el modelo Mixtral ===
+# === Función para el modelo Mixtral ===
 def ask_mixtral(prompt):
     """
     Envía un prompt a mistralai/Mixtral-8x7B-Instruct-v0.1 via API de Inferencia.
@@ -98,7 +119,7 @@ def ask_mixtral(prompt):
     except Exception as e:
         return f"Error inesperado con Mixtral: {e}"
 
-# === Nueva Función para el modelo Llama 3.1 ===
+# === Función para el modelo Llama 3.1 ===
 def ask_llama(prompt):
     """
     Envía un prompt a meta-llama/Llama-3.1-8B-Instruct via API de Inferencia.
@@ -114,7 +135,7 @@ def ask_llama(prompt):
             "max_new_tokens": 250,
             "temperature": 0.7,
             "do_sample": True,
-            "return_full_text": False # Solo devuelve el texto generado
+            "return_full_text": False
         }
     }
 
@@ -148,10 +169,10 @@ def responder(mensaje):
             if ciudad:
                 return obtener_clima(ciudad)
         return "Para el clima, por favor especifica la ciudad (ej. 'clima en Londres')."
-    elif mensaje_lower.startswith("ia mixtral:"): # Nuevo prefijo para Mixtral
+    elif mensaje_lower.startswith("ia mixtral:"):
         pregunta_ia = mensaje[len("ia mixtral:"):].strip()
         return ask_mixtral(pregunta_ia)
-    elif mensaje_lower.startswith("ia llama:"): # Nuevo prefijo para Llama
+    elif mensaje_lower.startswith("ia llama:"):
         pregunta_ia = mensaje[len("ia llama:"):].strip()
         return ask_llama(pregunta_ia)
     else:
